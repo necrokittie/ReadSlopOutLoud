@@ -534,6 +534,7 @@ class ReadSlopOutLoudApp:
         self._prev_sent_start = 0
         self._highlight_tag = "word_hl"
         self._selected_file = None
+        self._mp3_output_dir = Path(__file__).parent / "output"
 
         # Style
         self.style = ttk.Style()
@@ -738,25 +739,37 @@ class ReadSlopOutLoudApp:
         exp_ctrl = Frame(export_row, bg=self._c("BG"))
         exp_ctrl.grid(row=1, column=0, sticky=EW, pady=(4, 0))
 
-        self._convert_btn = Button(exp_ctrl, text="Convert", bg=self._c("ACCENT"),
-                                    fg=self._c("FG"), relief="flat", font=("Segoe UI", 9),
-                                    cursor="hand2", command=self._convert_selected)
-        self._convert_btn.pack(side=LEFT, padx=(0, 6))
-        self._open_folder_btn = Button(exp_ctrl, text="Go to MP3", bg=self._c("INPUT"),
-                                        fg=self._c("FG2"), relief="flat",
-                                        font=("Segoe UI", 9), cursor="hand2",
-                                        command=self._open_output_folder)
-        self._open_folder_btn.pack(side=LEFT, padx=(0, 6))
-        Button(exp_ctrl, text="Select File", bg=self._c("INPUT"), fg=self._c("FG2"),
+        Button(exp_ctrl, text="Select Input File", bg=self._c("INPUT"), fg=self._c("FG2"),
                relief="flat", font=("Segoe UI", 9), cursor="hand2",
                command=self._browse_file).pack(side=LEFT, padx=(0, 6))
         self._file_name_lbl = Label(exp_ctrl, text="", bg=self._c("BG"), fg=self._c("FG"),
                                      font=("Segoe UI", 9), anchor="w")
         self._file_name_lbl.pack(side=LEFT, padx=(0, 6))
+        self._convert_btn = Button(exp_ctrl, text="Convert", bg=self._c("ACCENT"),
+                                    fg=self._c("FG"), relief="flat", font=("Segoe UI", 9),
+                                    cursor="hand2", command=self._convert_selected)
+        self._convert_btn.pack(side=LEFT, padx=(0, 6))
         self._convert_status_lbl = Label(exp_ctrl, text="", bg=self._c("BG"),
                                           fg=self._c("WARN_COL"),
                                           font=("Segoe UI", 8, "italic"))
-        self._convert_status_lbl.pack(side=LEFT, padx=(0, 0))
+        self._convert_status_lbl.pack(side=LEFT, padx=(0, 6))
+
+        Label(export_row, text="Output folder:", bg=self._c("BG"), fg=self._c("FG2"),
+              font=("Segoe UI", 9)).grid(row=2, column=0, sticky=W, pady=(4, 0))
+        out_row = Frame(export_row, bg=self._c("BG"))
+        out_row.grid(row=3, column=0, sticky=EW, pady=(2, 0))
+        Button(out_row, text="Choose Output Folder", bg=self._c("INPUT"), fg=self._c("FG2"),
+               relief="flat", font=("Segoe UI", 9), cursor="hand2",
+               command=self._browse_output_folder).pack(side=LEFT, padx=(0, 6))
+        self._output_dir_lbl = Label(out_row, text=str(self._mp3_output_dir),
+                                      bg=self._c("BG"), fg=self._c("FG"),
+                                      font=("Segoe UI", 8), anchor="w")
+        self._output_dir_lbl.pack(side=LEFT)
+        self._open_folder_btn = Button(out_row, text="Open Output Folder", bg=self._c("INPUT"),
+                                        fg=self._c("FG2"), relief="flat",
+                                        font=("Segoe UI", 9), cursor="hand2",
+                                        command=self._open_output_folder)
+        self._open_folder_btn.pack(side=LEFT, padx=(6, 0))
 
     def _build_settings_content(self):
         for w in self._settings_frame.winfo_children():
@@ -1147,6 +1160,13 @@ class ReadSlopOutLoudApp:
             if not self._stopped_flag:
                 self._reset_ui()
 
+    def _browse_output_folder(self):
+        path = filedialog.askdirectory(title="Select output folder for MP3", mustexist=True)
+        if not path:
+            return
+        self._mp3_output_dir = Path(path)
+        self._output_dir_lbl.config(text=str(self._mp3_output_dir))
+
     def _browse_file(self):
         path = filedialog.askopenfilename(
             title="Select text file to convert to MP3",
@@ -1175,8 +1195,8 @@ class ReadSlopOutLoudApp:
             self._convert_status_lbl.config(text="File is empty")
             return
 
-        out_dir = Path.cwd() / "output"
-        out_dir.mkdir(exist_ok=True)
+        out_dir = self._mp3_output_dir
+        out_dir.mkdir(parents=True, exist_ok=True)
         out_path = out_dir / self._selected_file.with_suffix(".mp3").name
         voice_key = self._voice_var.get()
         voice_id = VOICES.get(voice_key, voice_key)
@@ -1252,8 +1272,8 @@ class ReadSlopOutLoudApp:
             return None
 
     def _open_output_folder(self):
-        out_dir = Path.cwd() / "output"
-        out_dir.mkdir(exist_ok=True)
+        out_dir = self._mp3_output_dir
+        out_dir.mkdir(parents=True, exist_ok=True)
         if hasattr(self, '_last_mp3') and self._last_mp3:
             os.startfile(str(Path(self._last_mp3).parent))
         elif out_dir.exists():
