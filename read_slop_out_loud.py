@@ -124,7 +124,7 @@ VOICES = {
 
 _kokoro_cache = {}
 
-def _get_pipeline(voice_id):
+def _get_pipeline(voice_id, status_cb=None):
     import os as _os
     import logging
     if not _os.environ.get("HF_HUB_DISABLE_PROGRESS_BARS"):
@@ -135,13 +135,16 @@ def _get_pipeline(voice_id):
     from kokoro import KPipeline
     lang = "b" if voice_id.startswith("b") else "a"
     if lang not in _kokoro_cache:
+        voice_name = voice_id.replace("_", " ").title()
+        if status_cb:
+            status_cb(f"Loading voice: {voice_name}...")
         _kokoro_cache[lang] = KPipeline(lang_code=lang, repo_id='hexgrad/Kokoro-82M')
     return _kokoro_cache[lang]
 
 
-def kokoro_to_wav(text, voice_id, speed, out_path):
+def kokoro_to_wav(text, voice_id, speed, out_path, status_cb=None):
     import soundfile as sf
-    pipeline = _get_pipeline(voice_id)
+    pipeline = _get_pipeline(voice_id, status_cb=status_cb)
     chunks = []
     for _, _, audio in pipeline(text, voice=voice_id, speed=speed):
         chunks.append(audio)
@@ -272,7 +275,7 @@ class TTSReader:
 
     def _play_thread(self):
         import sounddevice as sd
-        self._last_pipeline = _get_pipeline(self._voice_id)
+        self._last_pipeline = _get_pipeline(self._voice_id, status_cb=self._status_cb)
         self._last_pipeline_voice = self._voice_id
         while self._sentence_idx < len(self._sentences):
             if self._stopped:
@@ -284,7 +287,7 @@ class TTSReader:
                 self._sentence_callback(self._sentence_idx, sentence)
 
             if self._voice_id != self._last_pipeline_voice:
-                self._last_pipeline = _get_pipeline(self._voice_id)
+                self._last_pipeline = _get_pipeline(self._voice_id, status_cb=self._status_cb)
                 self._last_pipeline_voice = self._voice_id
 
             try:
@@ -372,7 +375,7 @@ class TTSReader:
     def text_to_mp3(self, text, voice_id, speed, out_path):
         wav_path = Path(gettempdir()) / f"_tts_reader_{hash(text) % 1000000}.wav"
         try:
-            kokoro_to_wav(text, voice_id, speed, str(wav_path))
+            kokoro_to_wav(text, voice_id, speed, str(wav_path), status_cb=self._status)
             subprocess.run([
                 "ffmpeg", "-y", "-i", str(wav_path),
                 "-codec:a", "libmp3lame", "-qscale:a", "2",
